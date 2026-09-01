@@ -2,20 +2,45 @@
   let selectedColor = "Nude";
   let selectedSize = "M";
   let selectedPack = { qty: 2, price: 599, compare: 698 };
-  function buildMessage(){
-    return "Hi! I'm interested in the AMBRE High-Waist Sculpting Shorts — " + selectedPack.qty + (selectedPack.qty > 1 ? " Piece Pack" : " Piece") + ", Size " + selectedSize + ", " + selectedColor + " (₹" + selectedPack.price + "). Could you help me confirm fit and delivery to my area?";
+
+  // ---------- PAYMENT: Prepaid vs COD ----------
+  const PREPAID_DISCOUNT_PERCENT = 10; // % off for choosing prepaid
+  const UPI_ID = "yourupi@bank";       // TODO: replace with your real UPI ID
+  let selectedPayment = "prepaid";     // "prepaid" (default) or "cod"
+
+  function getFinalPrice(){
+    if(selectedPayment === "cod") return selectedPack.price;
+    return Math.round(selectedPack.price * (1 - PREPAID_DISCOUNT_PERCENT / 100));
   }
+
+  function buildMessage(){
+    const finalPrice = getFinalPrice();
+    const packLabel = selectedPack.qty + (selectedPack.qty > 1 ? " Piece Pack" : " Piece");
+    let msg = "Hi! I'm interested in the AMBRE High-Waist Sculpting Shorts — " + packLabel + ", Size " + selectedSize + ", " + selectedColor + " (₹" + finalPrice + ").";
+    if(selectedPayment === "prepaid"){
+      msg += " I'd like to pay prepaid (UPI) and get the " + PREPAID_DISCOUNT_PERCENT + "% discount.";
+    } else {
+      msg += " I'd like to pay Cash on Delivery.";
+    }
+    msg += " Could you help me confirm fit and delivery to my area?";
+    return msg;
+  }
+
   function updatePriceNote(){
     const note = document.getElementById('priceNote');
     if(!note) return;
-    const saveAmt = selectedPack.compare - selectedPack.price;
+    const finalPrice = getFinalPrice();
     const pieceLabel = selectedPack.qty > 1 ? (selectedPack.qty + ' pieces') : '1 piece';
-    let html = '₹' + selectedPack.price + ' <strong>&nbsp;·&nbsp;' + pieceLabel + '</strong>';
-    if(saveAmt > 0){
-      html += ' <span class="save-badge">Save ₹' + saveAmt + '</span>';
+    let html = '₹' + finalPrice + ' <strong>&nbsp;·&nbsp;' + pieceLabel + '</strong>';
+    const compareSave = selectedPack.compare - selectedPack.price;
+    const prepaidSave = selectedPack.price - finalPrice;
+    const totalSave = compareSave + prepaidSave;
+    if(totalSave > 0){
+      html += ' <span class="save-badge">Save ₹' + totalSave + '</span>';
     }
     note.innerHTML = html;
   }
+
   function refreshLinks(){
     const waLink = "https://wa.me/919061082040?text=" + encodeURIComponent(buildMessage());
     ["heroBuy","mainBuy","stickyBuy"].forEach(id => {
@@ -23,6 +48,59 @@
       if(el) el.setAttribute("href", waLink);
     });
   }
+
+  function setPaymentUI(){
+    const prepaidBtn = document.getElementById('paymentPrepaidBtn');
+    const codBtn = document.getElementById('paymentCodBtn');
+    if(prepaidBtn) prepaidBtn.classList.toggle('active', selectedPayment === 'prepaid');
+    if(codBtn) codBtn.classList.toggle('active', selectedPayment === 'cod');
+  }
+
+  function initPaymentToggle(){
+    const anchor = document.getElementById('priceNote');
+    if(!anchor || document.getElementById('paymentToggle')) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'paymentToggle';
+    wrap.style.cssText = 'display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;';
+    wrap.innerHTML =
+      '<button type="button" id="paymentPrepaidBtn" style="flex:1;min-width:150px;padding:10px 14px;border-radius:999px;border:1px solid var(--nude,#D9B08C);background:transparent;color:inherit;font-size:0.82rem;font-weight:600;cursor:pointer;">' +
+        'Prepaid (UPI) — Save ' + PREPAID_DISCOUNT_PERCENT + '%' +
+      '</button>' +
+      '<button type="button" id="paymentCodBtn" style="flex:1;min-width:150px;padding:10px 14px;border-radius:999px;border:1px solid var(--line,#444);background:transparent;color:inherit;font-size:0.82rem;font-weight:600;cursor:pointer;">' +
+        'Cash on Delivery' +
+      '</button>';
+
+    // simple active-state styling injected once
+    if(!document.getElementById('paymentToggleStyle')){
+      const style = document.createElement('style');
+      style.id = 'paymentToggleStyle';
+      style.textContent =
+        '#paymentToggle button.active{background:var(--nude,#D9B08C);color:var(--espresso,#1a1210);}' +
+        '#paymentToggle button{transition:background .15s ease,color .15s ease;}';
+      document.head.appendChild(style);
+    }
+
+    anchor.insertAdjacentElement('afterend', wrap);
+
+    document.getElementById('paymentPrepaidBtn').addEventListener('click', () => {
+      selectedPayment = 'prepaid';
+      setPaymentUI();
+      updatePriceNote();
+      refreshLinks();
+    });
+    document.getElementById('paymentCodBtn').addEventListener('click', () => {
+      selectedPayment = 'cod';
+      setPaymentUI();
+      updatePriceNote();
+      refreshLinks();
+    });
+
+    setPaymentUI();
+  }
+
+  initPaymentToggle();
+  updatePriceNote();
 
   // Pack selector
   const packBtns = document.querySelectorAll('.pack-btn');
